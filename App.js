@@ -10,6 +10,7 @@ Ext.define('CustomApp', {
 
 		var context = this.getContext();
 		var project = context.getProject()['ObjectID'];
+		this.projectId = project;
 
 		console.log('project:', project);
 
@@ -98,8 +99,8 @@ Ext.define('CustomApp', {
 
 							reportStore.add(records[0]);
 
-							console.log('creating grid');
-							console.log('report store:', reportStore);
+							//console.log('creating grid');
+							//console.log('report store:', reportStore);
 
 							var grid = Ext.create('Ext.grid.Panel', {
 								height: 650,
@@ -140,7 +141,7 @@ Ext.define('CustomApp', {
 										width: 100,
 										sortable: true,
 										dataIndex: 'featureTotal'
-									}]									
+									}]
 								}, {
 									text: 'Stories',
 									columns:[{
@@ -257,7 +258,7 @@ Ext.define('CustomApp', {
 				featureStore.load().then({
 					success: function(records) {
 						this.features = records;
-						console.log('Features:', records);
+						//console.log('Features:', records);
 
 						var row = this._createRow(projectName, records);
 						deferred.resolve(row);
@@ -293,6 +294,7 @@ Ext.define('CustomApp', {
 
 
 				_.each(artifacts, function(artifact) {
+					//console.log(artifact.get('_type'));
 
 					//feature by state
 					if (artifact.get('_type') == 'portfolioitem/feature') {
@@ -377,7 +379,7 @@ Ext.define('CustomApp', {
 					defectPointsInProgress: defectPointsInProgress
 				};
 
-				console.log('project row:', row);
+				//console.log('project row:', row);
 
 				return row;
 			};
@@ -412,43 +414,81 @@ Ext.define('CustomApp', {
 
 
 			this._loadProjects = function(milestone) {
-				console.log('loading projects for milestone:', milestone);
+				//TODO
+				//gather all projects and subprojects based on current project and milestone selected 
+				//instead of all projects attached to the milestone selected.
 
-				var projects = milestone.getCollection('Projects',{
-					fetch: ['Name', 'ObjectID', 'Children']					
+
+				var projectStore = Ext.create('Rally.data.WsapiDataStore', {
+					model: 'Project',
+					fetch: ['Name', 'ObjectID', 'Children', 'Parent'],
+					filters: Rally.data.QueryFilter.or([
+						{
+							property: 'Parent.ObjectID',
+							value: that.projectId
+						}, {
+							property: 'Parent.Parent.ObjectID',
+							value: that.projectId
+						}
+					]),
+					limit: Infinity
 				});
 
-				projects.load({
-					callback: function(records, operation, success) {
-						console.log('projects loaded:', records);
-						var promises = [];
+				projectStore.load().then({
+					success: function(records) {
+						//this.stories = records;
+						//console.log('Projects based on current project:', records);
 
-						_.each(records, function(record) {
-							if (record.get('Children').Count == 0) {
-								var deferredFeature = Ext.create('Deft.Deferred');
-								var projectId = record.get('ObjectID');
-								var projectName = record.get('Name');
-
-								console.log();
-
-								that._createFeatureCall(projectId, projectName, deferredFeature, this);
-
-								promises.push(
-									deferredFeature
-								);
+						var childProjectIds = [];
+						_.each(records, function(project) {
+							if (project.get('Children').Count == 0) {
+								childProjectIds.push(project.get('ObjectID'));
 							}							
-		                });
-
-		                Deft.Promise.all(promises).then( {
-		                	//here we have all the features loaded
-							success: function(records) {
-
-								console.log('end promises - feature:', records);
-								deferred.resolve(records);
-							},
-							scope:this
 						});
 
+						console.log('child projects', childProjectIds);
+
+
+						//console.log('loading projects for milestone:', milestone);
+						//console.log('project id:', that.projectId);
+
+						var projects = milestone.getCollection('Projects',{
+							fetch: ['Name', 'ObjectID', 'Children', 'Parent'],					
+						});
+
+						projects.load({
+							callback: function(records, operation, success) {
+								//console.log('projects loaded:', records);
+								var promises = [];
+
+								_.each(records, function(record) {
+									var projectId = record.get('ObjectID');
+
+									if (Ext.Array.contains(childProjectIds, projectId)) {
+										var deferredFeature = Ext.create('Deft.Deferred');
+										var projectName = record.get('Name');
+
+										that._createFeatureCall(projectId, projectName, deferredFeature, this);
+
+										promises.push(
+											deferredFeature
+										);
+									}						
+				                });
+
+				                Deft.Promise.all(promises).then( {
+				                	//here we have all the features loaded
+									success: function(records) {
+
+										//console.log('end promises - feature:', records);
+										deferred.resolve(records);
+									},
+									scope:this
+								});
+
+							},
+							scope: this
+						});
 					},
 					scope: this
 				});
