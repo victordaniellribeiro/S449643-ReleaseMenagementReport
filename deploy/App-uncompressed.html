@@ -104,7 +104,7 @@
 
 					Deft.Promise.all(promises).then({
 						success: function(records) {
-							//console.log('before assembling grid: ', records[0]);
+							//console.log('before assembling grid: ', records);
 
 							reportStore.add(records[0]);
 
@@ -238,168 +238,6 @@
 	},
 
 
-	_createFeatureCall: function(projectId, projectName, deferred, that) {
-		function FeatureCall() {
-			this.deferred = deferred;
-			this.that = that;
-
-			this.execute = function() {
-				console.log('executing feature call', projectId);
-
-				this._loadFeatures(projectId);				
-				
-			},
-
-			this._loadFeatures = function(projectId) {
-				console.log('loading stories and defects for project:', projectId);
-
-				var featureStore = Ext.create('Rally.data.wsapi.artifact.Store', {
-					models: ['PortfolioItem/Feature', 'Defect', 'UserStory'],
-					fetch: ['FormattedID', 'Name', 'ObjectID', 'ScheduleState', 'PlanEstimate', 'Blocked', 'State', 'Type'],
-					filters: [{
-						property: 'Project.ObjectID',
-						operator: '=',
-						value: projectId
-					}],
-					limit: Infinity
-				});
-
-				featureStore.load().then({
-					success: function(records) {
-						this.features = records;
-						//console.log('Features:', records);
-
-						var row = this._createRow(projectName, records);
-						deferred.resolve(row);
-
-					},
-					scope: this
-				});
-				return deferred.promise;
-			},
-
-			this._createRow = function(projectName, artifacts)  {
-				var exploring = 0;
-				var elaborating = 0;
-				var inprogress = 0;
-				var staging = 0;
-				var done = 0;
-				var featureTotal = 0;
-
-				var storyPointsAccepted = 0;
-				var storyPointsInProgress = 0;
-				var storyPointsPercentCompleted = 0;
-				var storyTotal = 0;
-
-
-				var defectsUnelaborated = 0;
-				var defectsDefined = 0;
-				var defectsInProgress = 0;
-				var defectsCompleted = 0;
-				var defectsAccepted = 0;
-				var defectsReadyToShip = 0;
-				var defectPointsAccepted = 0;
-				var defectPointsInProgress = 0;
-
-
-				_.each(artifacts, function(artifact) {
-					//console.log(artifact.get('_type'));
-
-					//feature by state
-					if (artifact.get('_type') == 'portfolioitem/feature') {
-
-						if (artifact.get('State') != null) {
-							//console.log('State:', artifact.get('State').Name);
-
-							if (artifact.get('State').Name == 'Exploring') {
-								exploring += 1;
-							} else if (artifact.get('State').Name == 'Elaborating') {
-								elaborating +=1;
-							} else if (artifact.get('State').Name == 'In-Progress') {
-								inprogress +=1;
-							} else if (artifact.get('State').Name == 'Staging') {
-								staging +=1;
-							} else if (artifact.get('State').Name == 'Done') {
-								done +=1;
-							}
-							featureTotal +=1;
-						}
-					}
-
-					if (artifact.get('_type') == 'hierarchicalrequirement') {
-						if (artifact.get('ScheduleState') == 'Accepted') {
-							storyPointsAccepted += artifact.get('PlanEstimate');
-						} else if (artifact.get('ScheduleState') == 'Defined' || artifact.get('ScheduleState') == 'In-Progress') {
-							storyPointsInProgress += artifact.get('PlanEstimate');
-						}
-						storyTotal += artifact.get('PlanEstimate');
-					}
-
-
-					if (artifact.get('_type') == 'defect') {
-						if (artifact.get('ScheduleState') == 'Unelaborated') {
-							defectsUnelaborated += 1;
-						} else if (artifact.get('ScheduleState') == 'Defined') {
-							defectsDefined +=1;
-							defectPointsInProgress += artifact.get('PlanEstimate');
-						} else if (artifact.get('ScheduleState') == 'In-Progress') {
-							defectsInProgress +=1;
-							defectPointsInProgress += artifact.get('PlanEstimate');
-						} else if (artifact.get('ScheduleState') == 'Completed') {
-							defectsCompleted +=1;
-						} else if (artifact.get('ScheduleState') == 'Accepted') {
-							defectsAccepted +=1;
-							defectPointsAccepted += artifact.get('PlanEstimate');
-						} else if (artifact.get('ScheduleState') == 'Ready to Ship') {
-							defectsReadyToShip +=1;
-						}
-					}
-				});
-
-				if (storyTotal != 0) {
-					storyPointsPercentCompleted = Math.floor((storyPointsInProgress / storyTotal) * 100) + '%';
-				}
-
-				// console.log('Exploring total:', exploring);
-				// console.log('Elaborating total:', elaborating);
-				// console.log('In-Progress total:', inprogress);
-				// console.log('Staging total:', staging);
-				// console.log('Done total:', done);
-				// console.log(' total:', featureTotal);
-
-				var row = {
-					projectName: projectName,
-					exploring: exploring,
-					elaborating: elaborating,
-					inprogress: inprogress,
-					staging: staging,
-					done: done,
-					featureTotal: featureTotal,
-					storyPointsAccepted: storyPointsAccepted,
-					storyPointsInProgress: storyPointsInProgress,
-					storyPointsPercentCompleted: storyPointsPercentCompleted,
-					defectsUnelaborated: defectsUnelaborated,
-					defectsDefined: defectsDefined,
-					defectsInProgress: defectsInProgress,
-					defectsCompleted: defectsCompleted,
-					defectsAccepted: defectsAccepted,
-					defectsReadyToShip: defectsReadyToShip,
-					defectPointsAccepted: defectPointsAccepted,
-					defectPointsInProgress: defectPointsInProgress
-				};
-
-				//console.log('project row:', row);
-
-				return row;
-			};
-		}
-
-		var data = new FeatureCall(projectId, deferred, that);
-		data.execute();
-	},
-
-
-
 	_createDataCall: function(milestone, deferred, that) {
 		function DataCall() {
 			this.milestoneName = milestone.get('Name');
@@ -410,104 +248,327 @@
 			this.execute = function() {
 				console.log('executing call:', milestone);
 
-				// load projects
-				// for each project load its features
+				// load features for this milestone
 
-				this._loadProjects(milestone).then({
-					success: function(projects) {
-						console.log('projects loaded');
-						//return this._loadFeatures(projects);
-					}, scope: this
-				});
+				this._loadOrphanDefects(this.milestoneId).then({
+					success: function(records) {
+						this.orphanDefects = records;
+						return this._loadFeatures(this.milestoneId);
+					},
+					scope: this
+				}).then({
+					success: function(records) {
+						this.features = _.flatten(records);
+						return this._loadStories(records);
+					},
+					scope: this
+				}).then({
+		            success: function(records) {
+		            	//console.log('success stories:', records);
+		            	this.stories = _.flatten(records);
+		            	return this._loadDefects(records);
+		            },
+		            scope: this
+		        }).then({
+		        	success: function(records) {
+		        		//console.log('success defects:', records);
+		        		this.defects = _.flatten(records);
+
+		        		//console.log('features', this.features);
+		        		//console.log('stories', this.stories);
+		        		//console.log('defects', this.defects);
+		        		//console.log('orphan defects', this.orphanDefects);
+
+		        		var map = that._createProjectMap(this.features, this.stories, this.defects, this.orphanDefects);
+		        		//console.log('map', map);
+
+		        		var rows = [];
+		        		map.eachKey(function(projectName, artifacts) {
+		        			rows.push(that._createRow(projectName, artifacts));
+		        		});
+
+		        		deferred.resolve(rows);
+		        	}, scope: this
+		        });
 			},
 
 
-			this._loadProjects = function(milestone) {
-				//TODO
-				//gather all projects and subprojects based on current project and milestone selected 
-				//instead of all projects attached to the milestone selected.
+			this._loadFeatures = function(milestoneId) {
+				console.log('Loading features for milestone:', milestoneId);
 
-
-				var projectStore = Ext.create('Rally.data.WsapiDataStore', {
-					model: 'Project',
-					fetch: ['Name', 'ObjectID', 'Children', 'Parent'],
-					filters: Rally.data.QueryFilter.or([
-						{
-							property: 'Parent.ObjectID',
-							value: that.projectId
-						}, {
-							property: 'Parent.Parent.ObjectID',
-							value: that.projectId
-						}
-					]),
+				var featureStore = Ext.create('Rally.data.wsapi.artifact.Store', {
+					context: {
+				        projectScopeUp: false,
+				        projectScopeDown: true,
+				        project: null //null to search all workspace
+				    },
+					models: ['PortfolioItem/Feature'],
+					fetch: ['FormattedID', 'Name', 'ObjectID', 'Project', 'State', 'Type', 'UserStories'],
+					filters: [{
+						property: 'Milestones',
+						operator: '=',
+						value: '/milestone/'+milestoneId
+					}],
 					limit: Infinity
 				});
 
-				projectStore.load().then({
-					success: function(records) {
-						//this.stories = records;
-						//console.log('Projects based on current project:', records);
+				return featureStore.load();
+			},
 
-						var childProjectIds = [];
-						_.each(records, function(project) {
-							if (project.get('Children').Count == 0) {
-								childProjectIds.push(project.get('ObjectID'));
-							}							
+
+			this._loadStories = function(features) {
+				//console.log('Features before loading stories:', features);
+
+				var promises = [];
+
+            	_.each(features, function(feature) {
+            		var stories = feature.get('UserStories');
+
+					if (stories.Count > 0) {
+						stories.store = feature.getCollection('UserStories',{
+							fetch: [
+								'FormattedID', 
+								'Name', 
+								'ObjectID', 
+								'Children', 
+								'Defects', 
+								'ScheduleState', 
+								'Project', 
+								'PlanEstimate',
+								'Type',]
 						});
 
-						console.log('child projects', childProjectIds);
+						promises.push(stories.store.load());
 
-
-						//console.log('loading projects for milestone:', milestone);
-						//console.log('project id:', that.projectId);
-
-						var projects = milestone.getCollection('Projects',{
-							fetch: ['Name', 'ObjectID', 'Children', 'Parent'],					
-						});
-
-						projects.load({
-							callback: function(records, operation, success) {
-								//console.log('projects loaded:', records);
-								var promises = [];
-
-								_.each(records, function(record) {
-									var projectId = record.get('ObjectID');
-
-									if (Ext.Array.contains(childProjectIds, projectId)) {
-										var deferredFeature = Ext.create('Deft.Deferred');
-										var projectName = record.get('Name');
-
-										that._createFeatureCall(projectId, projectName, deferredFeature, this);
-
-										promises.push(
-											deferredFeature
-										);
-									}						
-				                });
-
-				                Deft.Promise.all(promises).then( {
-				                	//here we have all the features loaded
-									success: function(records) {
-
-										//console.log('end promises - feature:', records);
-										deferred.resolve(records);
-									},
-									scope:this
-								});
-
-							},
-							scope: this
-						});
-					},
-					scope: this
+					}
 				});
 
-				return deferred.promise;
-			};
+				return Deft.Promise.all(promises);
+			},
+
+
+			this._loadDefects = function(stories) {
+				stories = _.flatten(stories);
+				//console.log('Stories before loading defects:', stories);
+
+				var promises = [];
+
+            	_.each(stories, function(story) {
+            		var defects = story.get('Defects');
+					if (defects.Count > 0) {
+						defects.store = story.getCollection('Defects',{
+							fetch: [
+								'FormattedID', 
+								'Name', 
+								'ObjectID', 
+								'ScheduleState', 
+								'Project', 
+								'PlanEstimate', 
+								'Blocked', 
+								'Type', 
+								'Parent']
+						});
+
+						promises.push(defects.store.load());
+					}
+				});
+
+				return Deft.Promise.all(promises);
+			},
+
+
+			this._loadOrphanDefects = function(milestoneId) {
+				console.log('Loading orphan defects for milestone:', milestoneId);
+
+				var featureStore = Ext.create('Rally.data.wsapi.artifact.Store', {
+					context: {
+				        projectScopeUp: false,
+				        projectScopeDown: true,
+				        project: null //null to search all workspace
+				    },
+					models: ['Defect'],
+					fetch: ['FormattedID', 'Name', 'ObjectID', 'Project', 'PlanEstimate', 'ScheduleState', 'Type', 'Blocked', 'Parent'],
+					filters: [{
+						property: 'Milestones',
+						operator: '=',
+						value: '/milestone/'+milestoneId
+					}],
+					limit: Infinity
+				});
+
+				return featureStore.load();
+			}
 		}
 
 		var data = new DataCall(milestone, deferred, that);
 		data.execute();
+	},
+
+
+	_createProjectMap: function(features, stories, defects, orphanDefects) {
+		var map = new Ext.util.MixedCollection();
+
+		_.each(features, function(feature) {
+			var projectName = feature.get('Project').Name;
+			if (!map.containsKey(projectName)) {
+				var artifacts = [];
+				artifacts.push(feature);
+				map.add(projectName, artifacts);
+			} else {
+				map.get(projectName).push(feature);
+			}
+		});
+
+		_.each(stories, function(story) {
+			var projectName = story.get('Project').Name;
+			if (!map.containsKey(projectName)) {
+				var artifacts = [];
+				artifacts.push(story);
+				map.add(projectName, artifacts);
+			} else {
+				map.get(projectName).push(story);
+			}
+		});
+
+		_.each(defects, function(defect) {
+			var projectName = defect.get('Project').Name;
+			if (!map.containsKey(projectName)) {
+				var artifacts = [];
+				artifacts.push(defect);
+				map.add(projectName, artifacts);
+			} else {
+				map.get(projectName).push(defect);
+			}
+		});
+
+		_.each(orphanDefects, function(defect) {
+			var projectName = defect.get('Project').Name;
+			if (!map.containsKey(projectName)) {
+				var artifacts = [];
+				artifacts.push(defect);
+				map.add(projectName, artifacts);
+			} else {
+				map.get(projectName).push(defect);
+			}
+		});
+
+		return map;
+	},
+
+
+	_createRow:function(projectName, artifacts)  {
+		var exploring = 0;
+		var elaborating = 0;
+		var inprogress = 0;
+		var staging = 0;
+		var done = 0;
+		var featureTotal = 0;
+
+		var storyPointsAccepted = 0;
+		var storyPointsInProgress = 0;
+		var storyPointsPercentCompleted = 0;
+		var storyTotal = 0;
+
+
+		var defectsUnelaborated = 0;
+		var defectsDefined = 0;
+		var defectsInProgress = 0;
+		var defectsCompleted = 0;
+		var defectsAccepted = 0;
+		var defectsReadyToShip = 0;
+		var defectPointsAccepted = 0;
+		var defectPointsInProgress = 0;
+
+
+		_.each(artifacts, function(artifact) {
+			//console.log(artifact.get('_type'));
+
+			//feature by state
+			if (artifact.get('_type') == 'portfolioitem/feature') {
+
+				if (artifact.get('State') != null) {
+					//console.log('State:', artifact.get('State').Name);
+
+					if (artifact.get('State').Name == 'Exploring') {
+						exploring += 1;
+					} else if (artifact.get('State').Name == 'Elaborating') {
+						elaborating +=1;
+					} else if (artifact.get('State').Name == 'In-Progress') {
+						inprogress +=1;
+					} else if (artifact.get('State').Name == 'Staging') {
+						staging +=1;
+					} else if (artifact.get('State').Name == 'Done') {
+						done +=1;
+					}
+					featureTotal +=1;
+				}
+			}
+
+			if (artifact.get('_type') == 'hierarchicalrequirement') {
+				if (artifact.get('ScheduleState') == 'Accepted') {
+					storyPointsAccepted += artifact.get('PlanEstimate');
+				} else if (artifact.get('ScheduleState') == 'Defined' || artifact.get('ScheduleState') == 'In-Progress') {
+					storyPointsInProgress += artifact.get('PlanEstimate');
+				}
+				storyTotal += artifact.get('PlanEstimate');
+			}
+
+
+			if (artifact.get('_type') == 'defect') {
+				if (artifact.get('ScheduleState') == 'Unelaborated') {
+					defectsUnelaborated += 1;
+				} else if (artifact.get('ScheduleState') == 'Defined') {
+					defectsDefined +=1;
+					defectPointsInProgress += artifact.get('PlanEstimate');
+				} else if (artifact.get('ScheduleState') == 'In-Progress') {
+					defectsInProgress +=1;
+					defectPointsInProgress += artifact.get('PlanEstimate');
+				} else if (artifact.get('ScheduleState') == 'Completed') {
+					defectsCompleted +=1;
+				} else if (artifact.get('ScheduleState') == 'Accepted') {
+					defectsAccepted +=1;
+					defectPointsAccepted += artifact.get('PlanEstimate');
+				} else if (artifact.get('ScheduleState') == 'Ready to Ship') {
+					defectsReadyToShip +=1;
+				}
+			}
+		});
+
+		if (storyTotal != 0) {
+			storyPointsPercentCompleted = Math.floor((storyPointsInProgress / storyTotal) * 100) + '%';
+		}
+
+		// console.log('Exploring total:', exploring);
+		// console.log('Elaborating total:', elaborating);
+		// console.log('In-Progress total:', inprogress);
+		// console.log('Staging total:', staging);
+		// console.log('Done total:', done);
+		// console.log(' total:', featureTotal);
+
+		var row = {
+			projectName: projectName,
+			exploring: exploring,
+			elaborating: elaborating,
+			inprogress: inprogress,
+			staging: staging,
+			done: done,
+			featureTotal: featureTotal,
+			storyPointsAccepted: storyPointsAccepted,
+			storyPointsInProgress: storyPointsInProgress,
+			storyPointsPercentCompleted: storyPointsPercentCompleted,
+			defectsUnelaborated: defectsUnelaborated,
+			defectsDefined: defectsDefined,
+			defectsInProgress: defectsInProgress,
+			defectsCompleted: defectsCompleted,
+			defectsAccepted: defectsAccepted,
+			defectsReadyToShip: defectsReadyToShip,
+			defectPointsAccepted: defectPointsAccepted,
+			defectPointsInProgress: defectPointsInProgress
+		};
+
+		//console.log('project row:', row);
+
+		return row;
 	}
 });
 
