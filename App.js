@@ -40,188 +40,27 @@ Ext.define('CustomApp', {
 		});
 
 
-		var milestoneComboBox = Ext.create('Rally.ui.combobox.MilestoneComboBox', {
-			fieldLabel: 'Choose Milestone',
-			width: 250,
-			itemId: 'milestoneComboBox',
+		var releaseComboBox = Ext.create('Rally.ui.combobox.ReleaseComboBox', {
+			fieldLabel: 'Choose Release',
+			//width: 250,
+			itemId: 'releasaeComboBox',
 			allowClear: true,
 			scope: this,
 			listeners: {
 				ready: function(combobox) {
-					console.log('ready: ', combobox);
+					console.log('ready: ', combobox.getRecord());
+					var records = [combobox.getRecord()];
+					this._initReport(records);
 				},
 				select: function(combobox, records) {
 					console.log('comobo :', records);
-
-					var reportStore = Ext.create('Ext.data.JsonStore', {
-						fields: ['projectName',
-							'exploring',
-							'elaborating',
-							'inprogress',
-							'staging',
-							'done',
-							'featureTotal',
-							'storyPointsAccepted',
-							'storyPointsInProgress',
-							'storyPointsPercentCompleted',
-							'defectsUnelaborated',
-							'defectsDefined',
-							'defectsInProgress',
-							'defectsCompleted',
-							'defectsAccepted',
-							'defectsReadyToShip',
-							'defectPointsAccepted',
-							'defectPointsInProgress'
-
-						]
-					});
-
-					this.myMask.show();
-					var promises = [];
-
-
-					for (var j = 0; j < records.length; j++) {
-
-						var deferred = Ext.create('Deft.Deferred');
-
-						var i = j;
-						var milestoneId = records[i].get('ObjectID');
-						this._createDataCall(records[i], deferred, this);
-
-						promises.push(
-							deferred
-						);
-					}
-
-					Deft.Promise.all(promises).then({
-						success: function(records) {
-							//console.log('before assembling grid: ', records);
-
-							reportStore.add(records[0]);
-
-							//console.log('creating grid');
-							//console.log('report store:', reportStore);
-
-							var grid = Ext.create('Ext.grid.Panel', {
-								height: 650,
-								columns: [{
-									text: 'Project Name',
-									flex: 1,
-									sortable: true,
-									dataIndex: 'projectName'
-								}, {
-									text: 'Features',
-									columns:[{
-										text: 'Exploring',
-										width: 75,
-										sortable: true,
-										dataIndex: 'exploring'
-									}, {
-										text: 'Elaborating',
-										width: 75,
-										sortable: true,
-										dataIndex: 'elaborating'
-									}, {
-										text: 'In-Progress',
-										width: 75,
-										sortable: true,
-										dataIndex: 'inprogress'
-									}, {
-										text: 'Staging',
-										width: 75,
-										sortable: true,
-										dataIndex: 'staging'
-									}, {
-										text: 'Done',
-										width: 75,
-										sortable: true,
-										dataIndex: 'done'
-									}, {
-										text: 'Total of Features',
-										width: 100,
-										sortable: true,
-										dataIndex: 'featureTotal'
-									}]
-								}, {
-									text: 'Stories',
-									columns:[{
-										text: 'Story Points Accepted',
-										width: 120,
-										sortable: true,
-										dataIndex: 'storyPointsAccepted'
-									}, {
-										text: 'Story Points In-Progress',
-										width: 130,
-										sortable: true,
-										dataIndex: 'storyPointsInProgress'
-									}, {
-										text: 'Percent Story Points Completed',
-										width: 170,
-										sortable: true,
-										dataIndex: 'storyPointsPercentCompleted'
-									}]
-								}, {
-									text: 'Defects',
-									columns:[{
-										text: 'Unelaborated',
-										width: 80,
-										sortable: true,
-										dataIndex: 'defectsUnelaborated'
-									}, {
-										text: 'Defined',
-										width: 70,
-										sortable: true,
-										dataIndex: 'defectsDefined'
-									}, {
-										text: 'In-Progress',
-										width: 75,
-										sortable: true,
-										dataIndex: 'defectsInProgress'
-									}, {
-										text: 'Completed',
-										width: 75,
-										sortable: true,
-										dataIndex: 'defectsCompleted'
-									}, {
-										text: 'Accepted',
-										width: 75,
-										sortable: true,
-										dataIndex: 'defectsAccepted'
-									}, {
-										text: 'Read to Ship',
-										width: 80,
-										sortable: true,
-										dataIndex: 'defectsReadyToShip'
-									}, {
-										text: 'Defect Points Accepted',
-										width: 130,
-										sortable: true,
-										dataIndex: 'defectPointsAccepted'
-									}, {
-										text: 'Defect Points In-Progress',
-										width: 150,
-										sortable: true,
-										dataIndex: 'defectPointsInProgress'
-									}]
-								}],
-								flex: 1,
-								//title: 'Release: ' + releaseName,
-								store: reportStore
-							});
-
-							this.down('#mainPanel').removeAll(true);
-							this.down('#mainPanel').add(grid);
-
-							this.myMask.hide();
-						},
-						scope: this
-					});
+					this._initReport(records);
 				},
 				scope: this
 			}
 		});
 
-		filterPanel.add(milestoneComboBox);
+		filterPanel.add(releaseComboBox);
 
 		this.add(filterPanel);
 
@@ -229,22 +68,194 @@ Ext.define('CustomApp', {
 	},
 
 
-	_createDataCall: function(milestone, deferred, that) {
+	_initReport: function(records) {
+		console.log('records',  records);
+		var reportStore = Ext.create('Ext.data.JsonStore', {
+			fields: ['projectName',
+				'exploring',
+				'elaborating',
+				'inprogress',
+				'staging',
+				'done',
+				'featureTotal',
+				'storyPointsAccepted',
+				'storyPointsInProgress',
+				'storyPointsPercentCompleted',
+				'defectsUnelaborated',
+				'defectsDefined',
+				'defectsInProgress',
+				'defectsCompleted',
+				'defectsAccepted',
+				'defectsReadyToShip',
+				'defectPointsAccepted',
+				'defectPointsInProgress'
+
+			]
+		});
+
+		this.myMask.show();
+		var promises = [];
+
+
+		for (var j = 0; j < records.length; j++) {
+
+			var deferred = Ext.create('Deft.Deferred');
+
+			var i = j;
+			var milestoneId = records[i].get('ObjectID');
+			this._createDataCall(records[i], deferred, this);
+
+			promises.push(
+				deferred
+			);
+		}
+
+		Deft.Promise.all(promises).then({
+			success: function(records) {
+				//console.log('before assembling grid: ', records);
+
+				reportStore.add(records[0]);
+
+				//console.log('creating grid');
+				//console.log('report store:', reportStore);
+
+				var grid = Ext.create('Ext.grid.Panel', {
+					height: 650,
+					columns: [{
+						text: 'Project Name',
+						flex: 1,
+						sortable: true,
+						dataIndex: 'projectName'
+					}, {
+						text: 'Features',
+						columns:[{
+							text: 'Exploring',
+							width: 75,
+							sortable: true,
+							dataIndex: 'exploring'
+						}, {
+							text: 'Elaborating',
+							width: 75,
+							sortable: true,
+							dataIndex: 'elaborating'
+						}, {
+							text: 'In-Progress',
+							width: 75,
+							sortable: true,
+							dataIndex: 'inprogress'
+						}, {
+							text: 'Staging',
+							width: 75,
+							sortable: true,
+							dataIndex: 'staging'
+						}, {
+							text: 'Done',
+							width: 75,
+							sortable: true,
+							dataIndex: 'done'
+						}, {
+							text: 'Total of Features',
+							width: 100,
+							sortable: true,
+							dataIndex: 'featureTotal'
+						}]
+					}, {
+						text: 'Stories',
+						columns:[{
+							text: 'Story Points Accepted',
+							width: 120,
+							sortable: true,
+							dataIndex: 'storyPointsAccepted'
+						}, {
+							text: 'Story Points In-Progress',
+							width: 130,
+							sortable: true,
+							dataIndex: 'storyPointsInProgress'
+						}, {
+							text: 'Percent Story Points Completed',
+							width: 170,
+							sortable: true,
+							dataIndex: 'storyPointsPercentCompleted'
+						}]
+					}, {
+						text: 'Defects',
+						columns:[{
+							text: 'Unelaborated',
+							width: 80,
+							sortable: true,
+							dataIndex: 'defectsUnelaborated'
+						}, {
+							text: 'Defined',
+							width: 70,
+							sortable: true,
+							dataIndex: 'defectsDefined'
+						}, {
+							text: 'In-Progress',
+							width: 75,
+							sortable: true,
+							dataIndex: 'defectsInProgress'
+						}, {
+							text: 'Completed',
+							width: 75,
+							sortable: true,
+							dataIndex: 'defectsCompleted'
+						}, {
+							text: 'Accepted',
+							width: 75,
+							sortable: true,
+							dataIndex: 'defectsAccepted'
+						}, {
+							text: 'Read to Ship',
+							width: 80,
+							sortable: true,
+							dataIndex: 'defectsReadyToShip'
+						}, {
+							text: 'Defect Points Accepted',
+							width: 130,
+							sortable: true,
+							dataIndex: 'defectPointsAccepted'
+						}, {
+							text: 'Defect Points In-Progress',
+							width: 150,
+							sortable: true,
+							dataIndex: 'defectPointsInProgress'
+						}]
+					}],
+					flex: 1,
+					//title: 'Release: ' + releaseName,
+					store: reportStore
+				});
+
+				this.down('#mainPanel').removeAll(true);
+				this.down('#mainPanel').add(grid);
+
+				this.myMask.hide();
+			},
+			scope: this
+		});
+	},
+
+
+	_createDataCall: function(release, deferred, that) {
 		function DataCall() {
-			this.milestoneName = milestone.get('Name');
-			this.milestoneId = milestone.get('ObjectID');
+			this.releaseName = release.get('Name');
+			this.releaseId = release.get('ObjectID');
 			this.deferred = deferred;
 			this.that = that;
 
+			var context = that.getContext();
+			this.projectId = context.getProject()['ObjectID'];
+
 			this.execute = function() {
-				console.log('executing call:', milestone);
+				console.log('executing call:', release);
 
-				// load features for this milestone
+				// load features for this release
 
-				this._loadOrphanDefects(this.milestoneId).then({
+				this._loadOrphanDefects(this.releaseName, this.projectId).then({
 					success: function(records) {
+						console.log('orphan:', records);
 						this.orphanDefects = records;
-						return this._loadFeatures(this.milestoneId);
+						return this._loadFeatures(this.releaseName);
 					},
 					scope: this
 				}).then({
@@ -255,14 +266,14 @@ Ext.define('CustomApp', {
 					scope: this
 				}).then({
 		            success: function(records) {
-		            	//console.log('success stories:', records);
+		            	console.log('success stories:', records);
 		            	this.stories = _.flatten(records);
 		            	return this._loadDefects(records);
 		            },
 		            scope: this
 		        }).then({
 		        	success: function(records) {
-		        		//console.log('success defects:', records);
+		        		console.log('success defects:', records);
 		        		this.defects = _.flatten(records);
 
 		        		//console.log('features', this.features);
@@ -284,21 +295,21 @@ Ext.define('CustomApp', {
 			},
 
 
-			this._loadFeatures = function(milestoneId) {
-				console.log('Loading features for milestone:', milestoneId);
+			this._loadFeatures = function(releaseName) {
+				console.log('Loading features for release:', releaseName);
 
 				var featureStore = Ext.create('Rally.data.wsapi.artifact.Store', {
 					context: {
 				        projectScopeUp: false,
 				        projectScopeDown: true,
-				        project: null //null to search all workspace
+				        project: '/project/'+ this.projectId //null to search all workspace
 				    },
 					models: ['PortfolioItem/Feature'],
 					fetch: ['FormattedID', 'Name', 'ObjectID', 'Project', 'State', 'Type', 'UserStories'],
 					filters: [{
-						property: 'Milestones',
+						property: 'Release.Name',
 						operator: '=',
-						value: '/milestone/'+milestoneId
+						value: releaseName
 					}],
 					limit: Infinity
 				});
@@ -308,7 +319,7 @@ Ext.define('CustomApp', {
 
 
 			this._loadStories = function(features) {
-				//console.log('Features before loading stories:', features);
+				console.log('Features before loading stories:', features);
 
 				var promises = [];
 
@@ -340,7 +351,7 @@ Ext.define('CustomApp', {
 
 			this._loadDefects = function(stories) {
 				stories = _.flatten(stories);
-				//console.log('Stories before loading defects:', stories);
+				console.log('Stories before loading defects:', stories);
 
 				var promises = [];
 
@@ -368,21 +379,21 @@ Ext.define('CustomApp', {
 			},
 
 
-			this._loadOrphanDefects = function(milestoneId) {
-				console.log('Loading orphan defects for milestone:', milestoneId);
+			this._loadOrphanDefects = function(releaseName, projectId) {
+				console.log('Loading orphan defects for release:', releaseName);
 
 				var featureStore = Ext.create('Rally.data.wsapi.artifact.Store', {
 					context: {
 				        projectScopeUp: false,
 				        projectScopeDown: true,
-				        project: null //null to search all workspace
+				        project: /project/+projectId //null to search all workspace
 				    },
 					models: ['Defect'],
 					fetch: ['FormattedID', 'Name', 'ObjectID', 'Project', 'PlanEstimate', 'ScheduleState', 'Type', 'Blocked', 'Parent'],
 					filters: [{
-						property: 'Milestones',
+						property: 'Release.Name',
 						operator: '=',
-						value: '/milestone/'+milestoneId
+						value: releaseName
 					}],
 					limit: Infinity
 				});
@@ -391,7 +402,7 @@ Ext.define('CustomApp', {
 			}
 		}
 
-		var data = new DataCall(milestone, deferred, that);
+		var data = new DataCall(release, deferred, that);
 		data.execute();
 	},
 
@@ -456,6 +467,7 @@ Ext.define('CustomApp', {
 		var featureTotal = 0;
 
 		var storyPointsAccepted = 0;
+		var storyPointsReady = 0;
 		var storyPointsInProgress = 0;
 		var storyPointsPercentCompleted = 0;
 		var storyTotal = 0;
@@ -498,6 +510,8 @@ Ext.define('CustomApp', {
 			if (artifact.get('_type') == 'hierarchicalrequirement') {
 				if (artifact.get('ScheduleState') == 'Accepted') {
 					storyPointsAccepted += artifact.get('PlanEstimate');
+				} else if (artifact.get('ScheduleState') == 'Ready to Ship') {
+					storyPointsReady += artifact.get('PlanEstimate');
 				} else if (artifact.get('ScheduleState') == 'Defined' || artifact.get('ScheduleState') == 'In-Progress') {
 					storyPointsInProgress += artifact.get('PlanEstimate');
 				}
@@ -526,7 +540,7 @@ Ext.define('CustomApp', {
 		});
 
 		if (storyTotal != 0) {
-			storyPointsPercentCompleted = Math.floor((storyPointsInProgress / storyTotal) * 100) + '%';
+			storyPointsPercentCompleted = Math.floor(((storyPointsReady + storyPointsAccepted) / storyTotal) * 100) + '%';
 		}
 
 		// console.log('Exploring total:', exploring);
