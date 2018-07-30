@@ -467,7 +467,6 @@ Ext.define('CustomApp', {
 		var featureTotal = 0;
 
 		var storyPointsAccepted = 0;
-		var storyPointsReady = 0;
 		var storyPointsInProgress = 0;
 		var storyPointsPercentCompleted = 0;
 		var storyTotal = 0;
@@ -508,11 +507,9 @@ Ext.define('CustomApp', {
 			}
 
 			if (artifact.get('_type') == 'hierarchicalrequirement') {
-				if (artifact.get('ScheduleState') == 'Accepted') {
+				if ((artifact.get('ScheduleState') == 'Accepted') || (artifact.get('ScheduleState') == 'Ready to Ship')){
 					storyPointsAccepted += artifact.get('PlanEstimate');
-				} else if (artifact.get('ScheduleState') == 'Ready to Ship') {
-					storyPointsReady += artifact.get('PlanEstimate');
-				} else if (artifact.get('ScheduleState') == 'Defined' || artifact.get('ScheduleState') == 'In-Progress') {
+				} else if ((artifact.get('ScheduleState') != 'Accepted') && (artifact.get('ScheduleState') != 'Ready to Ship')) {
 					storyPointsInProgress += artifact.get('PlanEstimate');
 				}
 				storyTotal += artifact.get('PlanEstimate');
@@ -540,7 +537,7 @@ Ext.define('CustomApp', {
 		});
 
 		if (storyTotal != 0) {
-			storyPointsPercentCompleted = Math.floor(((storyPointsReady + storyPointsAccepted) / storyTotal) * 100) + '%';
+			storyPointsPercentCompleted = Math.floor((storyPointsAccepted / storyTotal) * 100) + '%';
 		}
 
 		// console.log('Exploring total:', exploring);
