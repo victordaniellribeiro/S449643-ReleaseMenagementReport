@@ -1,6 +1,15 @@
 Ext.define('CustomApp', {
 	extend: 'Rally.app.App',
 	componentCls: 'app',
+
+
+	_releaseId: undefined,
+	_releaseDate: undefined,
+	_stories: undefined,
+	_defects: undefined,
+	_orphanDefects: undefined,
+	_features: undefined,
+
 	launch: function() {
 		//Write app code here
 
@@ -22,6 +31,17 @@ Ext.define('CustomApp', {
 		});
 
 
+		var summaryPanel = Ext.create('Ext.panel.Panel', {
+			title: 'Summary',
+			layout: {
+				type: 'vbox',
+				align: 'stretch',
+				padding: 5
+			},
+			padding: 5,
+			itemId: 'summaryPanel',
+		});
+
 		var mainPanel = Ext.create('Ext.panel.Panel', {
 			title: 'Release Menagement Report',
 			layout: {
@@ -36,24 +56,24 @@ Ext.define('CustomApp', {
 
 		this.myMask = new Ext.LoadMask({
 			msg: 'Please wait...',
-			target: mainPanel
+			target: this
 		});
 
 
 		var releaseComboBox = Ext.create('Rally.ui.combobox.ReleaseComboBox', {
 			fieldLabel: 'Choose Release',
-			//width: 250,
+			width: 450,
 			itemId: 'releasaeComboBox',
 			allowClear: true,
 			scope: this,
 			listeners: {
 				ready: function(combobox) {
-					console.log('ready: ', combobox.getRecord());
+					// console.log('ready: ', combobox.getRecord());
 					var records = [combobox.getRecord()];
 					this._initReport(records);
 				},
 				select: function(combobox, records) {
-					console.log('comobo :', records);
+					// console.log('comobo :', records);
 					this._initReport(records);
 				},
 				scope: this
@@ -64,12 +84,61 @@ Ext.define('CustomApp', {
 
 		this.add(filterPanel);
 
+		this.add(summaryPanel);
+
 		this.add(mainPanel);
 	},
 
 
 	_initReport: function(records) {
-		console.log('records',  records);
+		// console.log('records',  records);
+		
+
+		this.myMask.show();
+		var promises = [];
+
+
+		for (var j = 0; j < records.length; j++) {
+
+			var deferred = Ext.create('Deft.Deferred');
+
+			var i = j;
+			// console.log('release', records[i]);
+
+			this._releaseId = records[i].get('ObjectID');
+			this._releaseDate = records[i].get('ReleaseDate');
+
+
+			this._createDataCall(records[i], deferred, this);
+
+			promises.push(
+				deferred
+			);
+		}
+
+		Deft.Promise.all(promises).then({
+			success: function(records) {
+				//console.log('before assembling grid: ', records);
+
+				var rows = records[0];
+				var reportGrid = this._createReportGrid(rows);
+				var summaryGrid = this._createSummaryGrid();
+
+				//console.log('creating grid');
+				//console.log('report store:', reportStore);
+
+				this.down('#mainPanel').removeAll(true);
+				this.down('#summaryPanel').add(summaryGrid);
+				this.down('#mainPanel').add(reportGrid);
+
+				this.myMask.hide();
+			},
+			scope: this
+		});
+	},
+
+
+	_createReportGrid: function(rows) {
 		var reportStore = Ext.create('Ext.data.JsonStore', {
 			fields: ['projectName',
 				'exploring',
@@ -93,146 +162,264 @@ Ext.define('CustomApp', {
 			]
 		});
 
-		this.myMask.show();
-		var promises = [];
+		reportStore.add(rows);
+		//console.log('rows', rows);
 
-
-		for (var j = 0; j < records.length; j++) {
-
-			var deferred = Ext.create('Deft.Deferred');
-
-			var i = j;
-			var milestoneId = records[i].get('ObjectID');
-			this._createDataCall(records[i], deferred, this);
-
-			promises.push(
-				deferred
-			);
-		}
-
-		Deft.Promise.all(promises).then({
-			success: function(records) {
-				//console.log('before assembling grid: ', records);
-
-				reportStore.add(records[0]);
-
-				//console.log('creating grid');
-				//console.log('report store:', reportStore);
-
-				var grid = Ext.create('Ext.grid.Panel', {
-					height: 650,
-					columns: [{
-						text: 'Project Name',
-						flex: 1,
-						sortable: true,
-						dataIndex: 'projectName'
-					}, {
-						text: 'Features',
-						columns:[{
-							text: 'Exploring',
-							width: 75,
-							sortable: true,
-							dataIndex: 'exploring'
-						}, {
-							text: 'Elaborating',
-							width: 75,
-							sortable: true,
-							dataIndex: 'elaborating'
-						}, {
-							text: 'In-Progress',
-							width: 75,
-							sortable: true,
-							dataIndex: 'inprogress'
-						}, {
-							text: 'Staging',
-							width: 75,
-							sortable: true,
-							dataIndex: 'staging'
-						}, {
-							text: 'Done',
-							width: 75,
-							sortable: true,
-							dataIndex: 'done'
-						}, {
-							text: 'Total of Features',
-							width: 100,
-							sortable: true,
-							dataIndex: 'featureTotal'
-						}]
-					}, {
-						text: 'Stories',
-						columns:[{
-							text: 'Story Points Accepted',
-							width: 120,
-							sortable: true,
-							dataIndex: 'storyPointsAccepted'
-						}, {
-							text: 'Story Points In-Progress',
-							width: 130,
-							sortable: true,
-							dataIndex: 'storyPointsInProgress'
-						}, {
-							text: 'Percent Story Points Completed',
-							width: 170,
-							sortable: true,
-							dataIndex: 'storyPointsPercentCompleted'
-						}]
-					}, {
-						text: 'Defects',
-						columns:[{
-							text: 'Unelaborated',
-							width: 80,
-							sortable: true,
-							dataIndex: 'defectsUnelaborated'
-						}, {
-							text: 'Defined',
-							width: 70,
-							sortable: true,
-							dataIndex: 'defectsDefined'
-						}, {
-							text: 'In-Progress',
-							width: 75,
-							sortable: true,
-							dataIndex: 'defectsInProgress'
-						}, {
-							text: 'Completed',
-							width: 75,
-							sortable: true,
-							dataIndex: 'defectsCompleted'
-						}, {
-							text: 'Accepted',
-							width: 75,
-							sortable: true,
-							dataIndex: 'defectsAccepted'
-						}, {
-							text: 'Read to Ship',
-							width: 80,
-							sortable: true,
-							dataIndex: 'defectsReadyToShip'
-						}, {
-							text: 'Defect Points Accepted',
-							width: 130,
-							sortable: true,
-							dataIndex: 'defectPointsAccepted'
-						}, {
-							text: 'Defect Points In-Progress',
-							width: 150,
-							sortable: true,
-							dataIndex: 'defectPointsInProgress'
-						}]
-					}],
-					flex: 1,
-					//title: 'Release: ' + releaseName,
-					store: reportStore
-				});
-
-				this.down('#mainPanel').removeAll(true);
-				this.down('#mainPanel').add(grid);
-
-				this.myMask.hide();
-			},
-			scope: this
+		var grid = Ext.create('Ext.grid.Panel', {
+			//height: 650,
+			columns: [{
+				text: 'Project Name',
+				flex: 1,
+				sortable: true,
+				dataIndex: 'projectName'
+			}, {
+				text: 'Features',
+				columns:[{
+					text: 'Exploring',
+					width: 75,
+					sortable: true,
+					dataIndex: 'exploring'
+				}, {
+					text: 'Elaborating',
+					width: 75,
+					sortable: true,
+					dataIndex: 'elaborating'
+				}, {
+					text: 'In-Progress',
+					width: 75,
+					sortable: true,
+					dataIndex: 'inprogress'
+				}, {
+					text: 'Staging',
+					width: 75,
+					sortable: true,
+					dataIndex: 'staging'
+				}, {
+					text: 'Done',
+					width: 75,
+					sortable: true,
+					dataIndex: 'done'
+				}, {
+					text: 'Total of Features',
+					width: 100,
+					sortable: true,
+					dataIndex: 'featureTotal'
+				}]
+			}, {
+				text: 'Stories',
+				columns:[{
+					text: 'Story Points Accepted',
+					width: 120,
+					sortable: true,
+					dataIndex: 'storyPointsAccepted'
+				}, {
+					text: 'Story Points In-Progress',
+					width: 130,
+					sortable: true,
+					dataIndex: 'storyPointsInProgress'
+				}, {
+					text: 'Percent Story Points Completed',
+					width: 170,
+					sortable: true,
+					dataIndex: 'storyPointsPercentCompleted'
+				}]
+			}, {
+				text: 'Defects',
+				columns:[{
+					text: 'Unelaborated',
+					width: 80,
+					sortable: true,
+					dataIndex: 'defectsUnelaborated'
+				}, {
+					text: 'Defined',
+					width: 70,
+					sortable: true,
+					dataIndex: 'defectsDefined'
+				}, {
+					text: 'In-Progress',
+					width: 75,
+					sortable: true,
+					dataIndex: 'defectsInProgress'
+				}, {
+					text: 'Completed',
+					width: 75,
+					sortable: true,
+					dataIndex: 'defectsCompleted'
+				}, {
+					text: 'Accepted',
+					width: 75,
+					sortable: true,
+					dataIndex: 'defectsAccepted'
+				}, {
+					text: 'Read to Ship',
+					width: 80,
+					sortable: true,
+					dataIndex: 'defectsReadyToShip'
+				}, {
+					text: 'Defect Points Accepted',
+					width: 130,
+					sortable: true,
+					dataIndex: 'defectPointsAccepted'
+				}, {
+					text: 'Defect Points In-Progress',
+					width: 150,
+					sortable: true,
+					dataIndex: 'defectPointsInProgress'
+				}]
+			}],
+			flex: 1,
+			//title: 'Release: ' + releaseName,
+			store: reportStore
 		});
+
+		return grid;
+	},
+
+
+	_createSummaryGrid: function() {
+		var summaryStore = Ext.create('Ext.data.JsonStore', {
+			fields: ['daysRemaining',
+				'totalStoryPoints',
+				'totalStoryPointsAccepted',
+				'totalDefectPoints',
+				'totalDefectPointsAccepted',
+				'totalFeaturePoints',
+				'totalFeaturePointsCompleted',
+				'percentageComplete',
+				'percentageShouldBeCompleted'
+			]
+		});
+
+		var releaseDate = this._releaseDate;
+		var today = new Date();
+		var one_day=1000*60*60*24;
+
+		var daysRemaining = Math.ceil((releaseDate.getTime() - today.getTime()) / (one_day));
+		//console.log(today, releaseDate, daysRemaining);
+
+		var totalStoryPoints = 0;
+		var totalStoryPointsAccepted = 0;
+		var totalDefectPoints = 0;
+		var totalDefectPointsAccepted = 0;
+		var totalFeaturePoints = 0;
+		var totalFeaturePointsCompleted = 0;
+		var percentageComplete = 0;
+		var percentageShouldBeCompleted = 0;
+
+
+
+		_.each(this._stories, function(story) {
+			totalStoryPoints += story.get('PlanEstimate');
+
+			if ((story.get('ScheduleState') === 'Accepted') || (story.get('ScheduleState') === 'Ready to Ship')){
+				totalStoryPointsAccepted += story.get('PlanEstimate');
+			}
+		});
+
+
+		_.each(this._defects, function(defect) {
+			totalDefectPoints += defect.get('PlanEstimate');
+
+			if ((defect.get('ScheduleState') === 'Accepted') || (defect.get('ScheduleState') === 'Ready to Ship')){
+				totalDefectPointsAccepted += defect.get('PlanEstimate');
+			}
+		});
+
+
+		_.each(this._orphanDefects, function(defect) {
+			totalDefectPoints += defect.get('PlanEstimate');
+
+			if ((defect.get('ScheduleState') === 'Accepted') || (defect.get('ScheduleState') === 'Ready to Ship')){
+				totalDefectPointsAccepted += defect.get('PlanEstimate');
+			}
+		});
+
+
+		_.each(this._features, function(feature) {
+			var state = feature.get('State');
+			totalFeaturePoints += feature.get('PreliminaryEstimateValue');
+
+			if (state && (state.Name === 'Staging' || state.Name === 'Done') ) {
+				totalFeaturePointsCompleted += feature.get('PreliminaryEstimateValue');
+			}
+		});
+
+
+		percentageComplete = ( ((totalStoryPointsAccepted + totalDefectPointsAccepted) / (totalStoryPoints + totalDefectPoints)) * 100).toFixed(2) + '%';
+		percentageShouldBeCompleted = ( (totalStoryPoints + totalDefectPoints) * (1 - (daysRemaining / 60)) ).toFixed(2) + '%';
+
+		var row = [];
+
+		var summary = {
+			daysRemaining: daysRemaining,
+			totalStoryPoints: totalStoryPoints,
+			totalStoryPointsAccepted: totalStoryPointsAccepted,
+			totalDefectPoints: totalDefectPoints,
+			totalDefectPointsAccepted: totalDefectPointsAccepted,
+			totalFeaturePoints: totalFeaturePoints,
+			totalFeaturePointsCompleted: totalFeaturePointsCompleted,
+			percentageComplete: percentageComplete,
+			percentageShouldBeCompleted: percentageShouldBeCompleted
+		};
+
+		row.push(summary);
+		summaryStore.add(row);
+
+
+		var grid = Ext.create('Ext.grid.Panel', {
+			//height: 650,			
+			columns:[{
+				text: 'Days Remaining',
+				sortable: true,
+				flex: 1,
+				dataIndex: 'daysRemaining'
+			}, {
+				text: 'Total Story Points',
+				sortable: true,
+				flex: 1,
+				dataIndex: 'totalStoryPoints'
+			}, {
+				text: 'Total Story Points Accepted',
+				sortable: true,
+				flex: 1,
+				dataIndex: 'totalStoryPointsAccepted'
+			}, {
+				text: 'Total Defect Points',
+				sortable: true,
+				flex: 1,
+				dataIndex: 'totalDefectPoints'
+			}, {
+				text: 'Total Defect Points Accepted',
+				sortable: true,
+				flex: 1,
+				dataIndex: 'totalDefectPointsAccepted'
+			}, {
+				text: 'Total Feature Points',
+				sortable: true,
+				flex: 1,
+				dataIndex: 'totalFeaturePoints'
+			}, {
+				text: 'Total Feature Points Completed',
+				sortable: true,
+				flex: 1,
+				dataIndex: 'totalFeaturePointsCompleted'
+			}, {
+				text: 'Percentage Completed',
+				sortable: true,
+				flex: 1,
+				dataIndex: 'percentageComplete'
+			}, {
+				text: 'Percentage That Should Be Completed',
+				flex: 1,
+				sortable: true,
+				dataIndex: 'percentageShouldBeCompleted'
+			}],
+			flex: 1,
+			//title: 'Release: ' + releaseName,
+			store: summaryStore
+		});
+
+		return grid;
 	},
 
 
@@ -247,34 +434,38 @@ Ext.define('CustomApp', {
 			this.projectId = context.getProject()['ObjectID'];
 
 			this.execute = function() {
-				console.log('executing call:', release);
+				// console.log('executing call:', release);
 
 				// load features for this release
 
 				this._loadOrphanDefects(this.releaseName, this.projectId).then({
 					success: function(records) {
-						console.log('orphan:', records);
+						// console.log('orphan:', records);
 						this.orphanDefects = records;
+						that._orphanDefects = records;
 						return this._loadFeatures(this.releaseName);
 					},
 					scope: this
 				}).then({
 					success: function(records) {
 						this.features = _.flatten(records);
+						that._features = this.features;
 						return this._loadStories(records);
 					},
 					scope: this
 				}).then({
 		            success: function(records) {
-		            	console.log('success stories:', records);
+		            	// console.log('success stories:', records);
 		            	this.stories = _.flatten(records);
+		            	that._stories = this.stories;
 		            	return this._loadDefects(records);
 		            },
 		            scope: this
 		        }).then({
 		        	success: function(records) {
-		        		console.log('success defects:', records);
+		        		// console.log('success defects:', records);
 		        		this.defects = _.flatten(records);
+		        		that._defects = this.defects;
 
 		        		//console.log('features', this.features);
 		        		//console.log('stories', this.stories);
@@ -296,7 +487,7 @@ Ext.define('CustomApp', {
 
 
 			this._loadFeatures = function(releaseName) {
-				console.log('Loading features for release:', releaseName);
+				// console.log('Loading features for release:', releaseName);
 
 				var featureStore = Ext.create('Rally.data.wsapi.artifact.Store', {
 					context: {
@@ -305,7 +496,7 @@ Ext.define('CustomApp', {
 				        project: '/project/'+ this.projectId //null to search all workspace
 				    },
 					models: ['PortfolioItem/Feature'],
-					fetch: ['FormattedID', 'Name', 'ObjectID', 'Project', 'State', 'Type', 'UserStories'],
+					fetch: ['FormattedID', 'Name', 'ObjectID', 'PreliminaryEstimate', 'PreliminaryEstimateValue', 'Project', 'State', 'Type', 'UserStories'],
 					filters: [{
 						property: 'Release.Name',
 						operator: '=',
@@ -319,7 +510,7 @@ Ext.define('CustomApp', {
 
 
 			this._loadStories = function(features) {
-				console.log('Features before loading stories:', features);
+				// console.log('Features before loading stories:', features);
 
 				var promises = [];
 
@@ -351,7 +542,7 @@ Ext.define('CustomApp', {
 
 			this._loadDefects = function(stories) {
 				stories = _.flatten(stories);
-				console.log('Stories before loading defects:', stories);
+				// console.log('Stories before loading defects:', stories);
 
 				var promises = [];
 
@@ -380,7 +571,7 @@ Ext.define('CustomApp', {
 
 
 			this._loadOrphanDefects = function(releaseName, projectId) {
-				console.log('Loading orphan defects for release:', releaseName);
+				// console.log('Loading orphan defects for release:', releaseName);
 
 				var featureStore = Ext.create('Rally.data.wsapi.artifact.Store', {
 					context: {
