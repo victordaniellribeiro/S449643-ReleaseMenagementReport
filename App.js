@@ -5,10 +5,15 @@ Ext.define('CustomApp', {
 
 	_releaseId: undefined,
 	_releaseDate: undefined,
+	_releaseInitDate: undefined,
+	_releaseEndDate: undefined,
 	_stories: undefined,
 	_defects: undefined,
 	_orphanDefects: undefined,
 	_features: undefined,
+
+
+	_defaultWorkDays: 60,
 
 	launch: function() {
 		//Write app code here
@@ -40,6 +45,12 @@ Ext.define('CustomApp', {
 			},
 			padding: 5,
 			itemId: 'summaryPanel',
+			items : [{
+				xtype:'container',
+	            itemId:'notes',
+	            padding: '0 0 10 0',
+	            html: '* Percentage that should be complete is calculated by the total number of  work days that have elapsed by the number of work days in a release'
+			}]
 		});
 
 		var mainPanel = Ext.create('Ext.panel.Panel', {
@@ -51,7 +62,7 @@ Ext.define('CustomApp', {
 			},
 			//height: 800,
 			padding: 5,
-			itemId: 'mainPanel',
+			itemId: 'mainPanel'
 		});
 
 		this.myMask = new Ext.LoadMask({
@@ -70,10 +81,20 @@ Ext.define('CustomApp', {
 				ready: function(combobox) {
 					// console.log('ready: ', combobox.getRecord());
 					var records = [combobox.getRecord()];
+					this._releaseInitDate = combobox.getRecord().get('ReleaseStartDate');
+					this._releaseEndDate = combobox.getRecord().get('ReleaseDate');
+
+
+					this._setDefaultWorkDays();
 					this._initReport(records);
 				},
 				select: function(combobox, records) {
 					// console.log('comobo :', records);
+
+					this._releaseInitDate = combobox.getRecord().get('ReleaseStartDate');
+					this._releaseEndDate = combobox.getRecord().get('ReleaseDate');
+
+					this._setDefaultWorkDays();
 					this._initReport(records);
 				},
 				scope: this
@@ -87,6 +108,22 @@ Ext.define('CustomApp', {
 		this.add(summaryPanel);
 
 		this.add(mainPanel);
+	},
+
+
+	_setDefaultWorkDays: function() {
+		var workDays = 0;
+
+		var one_day=1000*60*60*24;
+
+		var daysOfRelease = Math.ceil((this._releaseEndDate.getTime() - this._releaseInitDate.getTime()) / (one_day));
+		console.log('release total days:', daysOfRelease);
+
+		workDays = (daysOfRelease - ((daysOfRelease / 7) * 2))
+
+
+		console.log('setting default work days:', workDays);
+		this._defaultWorkDays = workDays;
 	},
 
 
@@ -174,6 +211,7 @@ Ext.define('CustomApp', {
 				dataIndex: 'projectName'
 			}, {
 				text: 'Features',
+				flex: 3,
 				columns:[{
 					text: 'Exploring',
 					width: 75,
@@ -201,68 +239,70 @@ Ext.define('CustomApp', {
 					dataIndex: 'done'
 				}, {
 					text: 'Total of Features',
-					width: 100,
+					width: 80,
 					sortable: true,
 					dataIndex: 'featureTotal'
 				}]
 			}, {
 				text: 'Stories',
+				flex: 2,
 				columns:[{
 					text: 'Story Points Accepted',
-					width: 120,
+					// width: 120,
 					sortable: true,
 					dataIndex: 'storyPointsAccepted'
 				}, {
 					text: 'Story Points In-Progress',
-					width: 130,
+					// width: 130,
 					sortable: true,
 					dataIndex: 'storyPointsInProgress'
 				}, {
 					text: 'Percent Story Points Completed',
-					width: 170,
+					// width: 170,
 					sortable: true,
 					dataIndex: 'storyPointsPercentCompleted'
 				}]
 			}, {
 				text: 'Defects',
+				flex: 4,
 				columns:[{
 					text: 'Unelaborated',
-					width: 80,
+					width: 85,
 					sortable: true,
 					dataIndex: 'defectsUnelaborated'
 				}, {
 					text: 'Defined',
-					width: 70,
+					width: 55,
 					sortable: true,
 					dataIndex: 'defectsDefined'
 				}, {
 					text: 'In-Progress',
-					width: 75,
+					width: 65,
 					sortable: true,
 					dataIndex: 'defectsInProgress'
 				}, {
 					text: 'Completed',
-					width: 75,
+					width: 65,
 					sortable: true,
 					dataIndex: 'defectsCompleted'
 				}, {
 					text: 'Accepted',
-					width: 75,
+					width: 65,
 					sortable: true,
 					dataIndex: 'defectsAccepted'
 				}, {
 					text: 'Read to Ship',
-					width: 80,
+					width: 70,
 					sortable: true,
 					dataIndex: 'defectsReadyToShip'
 				}, {
 					text: 'Defect Points Accepted',
-					width: 130,
+					width: 120,
 					sortable: true,
 					dataIndex: 'defectPointsAccepted'
 				}, {
 					text: 'Defect Points In-Progress',
-					width: 150,
+					width: 130,
 					sortable: true,
 					dataIndex: 'defectPointsInProgress'
 				}]
@@ -279,6 +319,7 @@ Ext.define('CustomApp', {
 	_createSummaryGrid: function() {
 		var summaryStore = Ext.create('Ext.data.JsonStore', {
 			fields: ['daysRemaining',
+				'workingDaysRemaining',
 				'totalStoryPoints',
 				'totalStoryPointsAccepted',
 				'totalDefectPoints',
@@ -295,6 +336,7 @@ Ext.define('CustomApp', {
 		var one_day=1000*60*60*24;
 
 		var daysRemaining = Math.ceil((releaseDate.getTime() - today.getTime()) / (one_day));
+		var workingDaysRemaining = daysRemaining - (Math.ceil(daysRemaining / 7) * 2);
 		//console.log(today, releaseDate, daysRemaining);
 
 		var totalStoryPoints = 0;
@@ -346,12 +388,16 @@ Ext.define('CustomApp', {
 
 
 		percentageComplete = ( ((totalStoryPointsAccepted + totalDefectPointsAccepted) / (totalStoryPoints + totalDefectPoints)) * 100).toFixed(2) + '%';
-		percentageShouldBeCompleted = ( (totalStoryPoints + totalDefectPoints) * (1 - (daysRemaining / 60)) ).toFixed(2) + '%';
+
+		//60 – number of work days remaining)/60
+		percentageShouldBeCompleted = ( 100 * ((this._defaultWorkDays - workingDaysRemaining) / this._defaultWorkDays) ).toFixed(2) + '%';
+		//percentageShouldBeCompleted = ( (totalStoryPoints + totalDefectPoints) * (1 - (daysRemaining / 60)) ).toFixed(2) + '%';
 
 		var row = [];
 
 		var summary = {
 			daysRemaining: daysRemaining,
+			workingDaysRemaining: workingDaysRemaining,
 			totalStoryPoints: totalStoryPoints,
 			totalStoryPointsAccepted: totalStoryPointsAccepted,
 			totalDefectPoints: totalDefectPoints,
@@ -373,6 +419,11 @@ Ext.define('CustomApp', {
 				sortable: true,
 				flex: 1,
 				dataIndex: 'daysRemaining'
+			}, {
+				text: 'Working Days Remaining',
+				sortable: true,
+				flex: 1,
+				dataIndex: 'workingDaysRemaining'
 			}, {
 				text: 'Total Story Points',
 				sortable: true,
@@ -407,7 +458,15 @@ Ext.define('CustomApp', {
 				text: 'Percentage Completed',
 				sortable: true,
 				flex: 1,
-				dataIndex: 'percentageComplete'
+				dataIndex: 'percentageComplete',
+				renderer : function(value, meta, record) {
+				    if (parseFloat(value) > parseFloat(record.get('percentageShouldBeCompleted'))) {
+				        meta.style = "background-color:#cdf9c2;";
+				    } else {
+				        meta.style = "background-color:#ffe2e2;";
+				    }
+				    return value;
+				}
 			}, {
 				text: 'Percentage That Should Be Completed',
 				flex: 1,
