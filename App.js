@@ -165,6 +165,7 @@ Ext.define('CustomApp', {
 				//console.log('report store:', reportStore);
 
 				this.down('#mainPanel').removeAll(true);
+				this.down('#summaryPanel').removeAll(true);
 				this.down('#summaryPanel').add(summaryGrid);
 				this.down('#mainPanel').add(reportGrid);
 
@@ -324,6 +325,8 @@ Ext.define('CustomApp', {
 				'totalStoryPointsAccepted',
 				'totalDefectPoints',
 				'totalDefectPointsAccepted',
+				'totalTestSetPoints',
+				'totalTestSetPointsAccepted',
 				'totalFeaturePoints',
 				'totalFeaturePointsCompleted',
 				'percentageComplete',
@@ -343,6 +346,8 @@ Ext.define('CustomApp', {
 		var totalStoryPointsAccepted = 0;
 		var totalDefectPoints = 0;
 		var totalDefectPointsAccepted = 0;
+		var totalTestSetPoints = 0;
+		var totalTestSetPointsAccepted = 0;
 		var totalFeaturePoints = 0;
 		var totalFeaturePointsCompleted = 0;
 		var percentageComplete = 0;
@@ -368,6 +373,15 @@ Ext.define('CustomApp', {
 		});
 
 
+		_.each(this._testSets, function(testSet) {
+			totalTestSetPoints += testSet.get('PlanEstimate');
+
+			if ((testSet.get('ScheduleState') === 'Accepted') || (testSet.get('ScheduleState') === 'Ready to Ship')){
+				totalTestSetPointsAccepted += testSet.get('PlanEstimate');
+			}
+		});
+
+
 		_.each(this._orphanDefects, function(defect) {
 			totalDefectPoints += defect.get('PlanEstimate');
 
@@ -386,8 +400,8 @@ Ext.define('CustomApp', {
 			}
 		});
 
-
-		percentageComplete = ( ((totalStoryPointsAccepted + totalDefectPointsAccepted) / (totalStoryPoints + totalDefectPoints)) * 100).toFixed(2) + '%';
+		// Then in the percent complete it would be story accepted + defect accepted + Test Set accepted/total story + total defect + total test sets
+		percentageComplete = ( ((totalStoryPointsAccepted + totalDefectPointsAccepted + totalTestSetPointsAccepted) / (totalStoryPoints + totalDefectPoints + totalTestSetPoints)) * 100).toFixed(2) + '%';
 
 		//60 – number of work days remaining)/60
 		percentageShouldBeCompleted = ( 100 * ((this._defaultWorkDays - workingDaysRemaining) / this._defaultWorkDays) ).toFixed(2) + '%';
@@ -402,6 +416,8 @@ Ext.define('CustomApp', {
 			totalStoryPointsAccepted: totalStoryPointsAccepted,
 			totalDefectPoints: totalDefectPoints,
 			totalDefectPointsAccepted: totalDefectPointsAccepted,
+			totalTestSetPoints: totalTestSetPoints,
+			totalTestSetPointsAccepted: totalTestSetPointsAccepted,
 			totalFeaturePoints: totalFeaturePoints,
 			totalFeaturePointsCompleted: totalFeaturePointsCompleted,
 			percentageComplete: percentageComplete,
@@ -444,6 +460,16 @@ Ext.define('CustomApp', {
 				sortable: true,
 				flex: 1,
 				dataIndex: 'totalDefectPointsAccepted'
+			}, {
+				text: 'Total TestSet Points',
+				sortable: true,
+				flex: 1,
+				dataIndex: 'totalTestSetPoints'
+			}, {
+				text: 'Total TestSet Points Accepted',
+				sortable: true,
+				flex: 1,
+				dataIndex: 'totalTestSetPointsAccepted'
 			}, {
 				text: 'Total Feature Points',
 				sortable: true,
@@ -521,17 +547,25 @@ Ext.define('CustomApp', {
 		            },
 		            scope: this
 		        }).then({
+		            success: function(records) {
+		            	// console.log('success defects:', records);
+		            	this.defects = _.flatten(records);
+		            	that._defects = this.defects;
+		            	return this._loadTestSets(this.releaseName);
+		            },
+		            scope: this
+		        }).then({
 		        	success: function(records) {
-		        		// console.log('success defects:', records);
-		        		this.defects = _.flatten(records);
-		        		that._defects = this.defects;
+		        		// console.log('success testSets:', records);
+		        		this.testSets = _.flatten(records);
+		        		that._testSets = this.testSets;
 
 		        		//console.log('features', this.features);
 		        		//console.log('stories', this.stories);
 		        		//console.log('defects', this.defects);
 		        		//console.log('orphan defects', this.orphanDefects);
 
-		        		var map = that._createProjectMap(this.features, this.stories, this.defects, this.orphanDefects);
+		        		var map = that._createProjectMap(this.features, this.stories, this.defects, this.orphanDefects, this.testSets);
 		        		//console.log('map', map);
 
 		        		var rows = [];
@@ -629,6 +663,29 @@ Ext.define('CustomApp', {
 			},
 
 
+			this._loadTestSets = function(releaseName) {
+				// console.log('Loading features for release:', releaseName);
+
+				var testSetStore = Ext.create('Rally.data.wsapi.artifact.Store', {
+					context: {
+				        projectScopeUp: false,
+				        projectScopeDown: true,
+				        project: '/project/'+ this.projectId //null to search all workspace
+				    },
+					models: ['TestSet'],
+					fetch: ['FormattedID', 'Name', 'ObjectID', 'PlanEstimate', 'Project', 'Type', 'ScheduleState', 'TestCases', 'TestCaseStatus', 'TestCaseCount'],
+					filters: [{
+						property: 'Release.Name',
+						operator: '=',
+						value: releaseName
+					}],
+					limit: Infinity
+				});
+
+				return testSetStore.load();
+			},
+
+
 			this._loadOrphanDefects = function(releaseName, projectId) {
 				// console.log('Loading orphan defects for release:', releaseName);
 
@@ -657,7 +714,7 @@ Ext.define('CustomApp', {
 	},
 
 
-	_createProjectMap: function(features, stories, defects, orphanDefects) {
+	_createProjectMap: function(features, stories, defects, orphanDefects, testSets) {
 		var map = new Ext.util.MixedCollection();
 
 		_.each(features, function(feature) {
@@ -703,6 +760,18 @@ Ext.define('CustomApp', {
 				map.get(projectName).push(defect);
 			}
 		});
+
+		_.each(testSets, function(testSet) {
+			var projectName = testSet.get('Project').Name;
+			if (!map.containsKey(projectName)) {
+				var artifacts = [];
+				artifacts.push(testSet);
+				map.add(projectName, artifacts);
+			} else {
+				map.get(projectName).push(testSet);
+			}
+		});
+
 
 		return map;
 	},
