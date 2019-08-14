@@ -15,6 +15,13 @@ Ext.define('CustomApp', {
 
 	_defaultWorkDays: 60,
 
+	_textExplainPercentage: {
+				xtype:'container',
+	            itemId:'notes',
+	            padding: '0 0 10 0',
+	            html: '* Percentage that should be complete is calculated by the total number of  work days that have elapsed by the number of work days in a release'
+			},
+
 	launch: function() {
 		//Write app code here
 
@@ -45,16 +52,11 @@ Ext.define('CustomApp', {
 			},
 			padding: 5,
 			itemId: 'summaryPanel',
-			items : [{
-				xtype:'container',
-	            itemId:'notes',
-	            padding: '0 0 10 0',
-	            html: '* Percentage that should be complete is calculated by the total number of  work days that have elapsed by the number of work days in a release'
-			}]
+			items : [this._textExplainPercentage]
 		});
 
 		var mainPanel = Ext.create('Ext.panel.Panel', {
-			title: 'Release Menagement Report',
+			title: 'Release Management Report',
 			layout: {
 				type: 'vbox',
 				align: 'stretch',
@@ -167,6 +169,7 @@ Ext.define('CustomApp', {
 				this.down('#mainPanel').removeAll(true);
 				this.down('#summaryPanel').removeAll(true);
 				this.down('#summaryPanel').add(summaryGrid);
+				this.down('#mainPanel').add(this._textExplainPercentage);
 				this.down('#mainPanel').add(reportGrid);
 
 				this.myMask.hide();
@@ -341,6 +344,14 @@ Ext.define('CustomApp', {
 		var daysRemaining = Math.ceil((releaseDate.getTime() - today.getTime()) / (one_day));
 		var workingDaysRemaining = daysRemaining - (Math.ceil(daysRemaining / 7) * 2);
 		//console.log(today, releaseDate, daysRemaining);
+
+		// console.log('releaseDate: ', releaseDate, releaseDate.getTime());
+		// console.log('days remaining', daysRemaining);
+
+		// console.log('days remaining / 7', daysRemaining / 7);
+		// console.log('days remaining / 7 with ceil', Math.ceil(daysRemaining / 7));
+		// console.log('days remaining / 7 with ceil * 2', (Math.ceil(daysRemaining / 7) *2));
+		// console.log('working days remaining ', workingDaysRemaining);
 
 		var totalStoryPoints = 0;
 		var totalStoryPointsAccepted = 0;
@@ -525,7 +536,7 @@ Ext.define('CustomApp', {
 
 				this._loadOrphanDefects(this.releaseName, this.projectId).then({
 					success: function(records) {
-						// console.log('orphan:', records);
+						console.log('orphan:', records);
 						this.orphanDefects = records;
 						that._orphanDefects = records;
 						return this._loadFeatures(this.releaseName);
@@ -540,7 +551,7 @@ Ext.define('CustomApp', {
 					scope: this
 				}).then({
 		            success: function(records) {
-		            	// console.log('success stories:', records);
+		            	console.log('success stories:', records);
 		            	this.stories = _.flatten(records);
 		            	that._stories = this.stories;
 		            	return this._loadDefects(records);
@@ -548,7 +559,7 @@ Ext.define('CustomApp', {
 		            scope: this
 		        }).then({
 		            success: function(records) {
-		            	// console.log('success defects:', records);
+		            	console.log('success defects:', records);
 		            	this.defects = _.flatten(records);
 		            	that._defects = this.defects;
 		            	return this._loadTestSets(this.releaseName);
@@ -580,7 +591,7 @@ Ext.define('CustomApp', {
 
 
 			this._loadFeatures = function(releaseName) {
-				// console.log('Loading features for release:', releaseName);
+				console.log('Loading features for release:', releaseName);
 
 				var featureStore = Ext.create('Rally.data.wsapi.artifact.Store', {
 					context: {
@@ -603,9 +614,15 @@ Ext.define('CustomApp', {
 
 
 			this._loadStories = function(features) {
-				// console.log('Features before loading stories:', features);
+				console.log('Features before loading stories:', features);
 
 				var promises = [];
+
+				if (!features || features.length === 0) {
+					var deferred = Ext.create('Deft.Deferred');
+					deferred.resolve(promises);
+					return deferred.promise;
+				}
 
             	_.each(features, function(feature) {
             		var stories = feature.get('UserStories');
@@ -635,13 +652,21 @@ Ext.define('CustomApp', {
 
 			this._loadDefects = function(stories) {
 				stories = _.flatten(stories);
-				// console.log('Stories before loading defects:', stories);
+				console.log('Stories before loading defects:', stories);
 
 				var promises = [];
 
+				if (!stories || stories.length === 0) {
+					var deferred = Ext.create('Deft.Deferred');
+					deferred.resolve(promises);
+					return deferred.promise;
+				}
+
+				var noDefects = true;
             	_.each(stories, function(story) {
             		var defects = story.get('Defects');
 					if (defects.Count > 0) {
+						noDefects = false;
 						defects.store = story.getCollection('Defects',{
 							fetch: [
 								'FormattedID', 
@@ -659,12 +684,25 @@ Ext.define('CustomApp', {
 					}
 				});
 
+				if (noDefects) {
+					console.log('No defects found');
+					var deferred = Ext.create('Deft.Deferred');
+					deferred.resolve(promises);
+					return deferred.promise;
+				}
+
 				return Deft.Promise.all(promises);
 			},
 
 
 			this._loadTestSets = function(releaseName) {
-				// console.log('Loading features for release:', releaseName);
+				console.log('Loading testSets for release:', releaseName);
+
+				// if (!stories || stories.length === 0) {
+				// 	var deferred = Ext.create('Deft.Deferred');
+				// 	deferred.resolve(promises);
+				// 	return deferred.promise;
+				// }
 
 				var testSetStore = Ext.create('Rally.data.wsapi.artifact.Store', {
 					context: {
@@ -719,6 +757,7 @@ Ext.define('CustomApp', {
 
 		_.each(features, function(feature) {
 			var projectName = feature.get('Project').Name;
+			console.log('Feature', feature.get('FormattedID'), 'Project:', projectName);
 			if (!map.containsKey(projectName)) {
 				var artifacts = [];
 				artifacts.push(feature);
@@ -730,6 +769,7 @@ Ext.define('CustomApp', {
 
 		_.each(stories, function(story) {
 			var projectName = story.get('Project').Name;
+			console.log('Story', story.get('FormattedID'), 'Project:', projectName);
 			if (!map.containsKey(projectName)) {
 				var artifacts = [];
 				artifacts.push(story);
