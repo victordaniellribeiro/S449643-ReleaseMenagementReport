@@ -121,7 +121,7 @@ Ext.define('CustomApp', {
 		var daysOfRelease = Math.ceil((this._releaseEndDate.getTime() - this._releaseInitDate.getTime()) / (one_day));
 		console.log('release total days:', daysOfRelease);
 
-		workDays = (daysOfRelease - ((daysOfRelease / 7) * 2))
+		workDays = (daysOfRelease - ((daysOfRelease / 7) * 2));
 
 
 		console.log('setting default work days:', workDays);
